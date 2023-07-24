@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Cloud Server</title>
+</head>
+<body>
+    <input type="file" id="fileInput">
+    <button onclick="uploadFile()">Upload</button>
+    <div id="fileList"></div>
+
+    <script>
+        let db;
+
+// Function to upload a file to IndexedDB
+function uploadFile() {
+    const fileInput = document.getElementById("fileInput");
+    const fileList = document.getElementById("fileList");
+
+    const file = fileInput.files[0];
+    if (file) {
+        const reader = new FileReader();
+
+        reader.onload = () => {
+            const fileData = reader.result;
+            const fileName = file.name;
+            initIndexedDB(() => {
+                saveFileToIndexedDB(fileName, fileData);
+                const fileLink = document.createElement("a");
+                fileLink.textContent = fileName;
+                fileLink.href = "#"; // You can set this to an actual download link
+                fileList.appendChild(fileLink);
+            });
+        };
+
+        reader.readAsDataURL(file);
+    }
+}
+
+// Function to save a file to IndexedDB
+function saveFileToIndexedDB(fileName, fileData) {
+    const transaction = db.transaction(["files"], "readwrite");
+    const objectStore = transaction.objectStore("files");
+
+    const request = objectStore.add({ name: fileName, data: fileData });
+
+    request.onsuccess = () => {
+        console.log("File added to IndexedDB");
+    };
+
+    request.onerror = (event) => {
+        console.error("Error adding file to IndexedDB", event.target.error);
+    };
+}
+
+// Function to load files from IndexedDB on page load
+function loadFilesFromIndexedDB() {
+    const fileList = document.getElementById("fileList");
+    
+    if (db) {
+        const transaction = db.transaction(["files"], "readonly");
+        const objectStore = transaction.objectStore("files");
+        const request = objectStore.getAll();
+
+        request.onsuccess = (event) => {
+            const files = event.target.result;
+            files.forEach((file) => {
+                const fileLink = document.createElement("a");
+                fileLink.textContent = file.name;
+                fileLink.href = "#"; // You can set this to an actual download link
+                fileList.appendChild(fileLink);
+            });
+        };
+
+        request.onerror = (event) => {
+            console.error("Error loading files from IndexedDB", event.target.error);
+        };
+    }
+}
+
+// Initialize IndexedDB
+function initIndexedDB(successCallback) {
+    const request = window.indexedDB.open("fileDB", 1);
+
+    request.onupgradeneeded = (event) => {
+        db = event.target.result;
+        const objectStore = db.createObjectStore("files", { keyPath: "id", autoIncrement: true });
+    };
+
+    request.onsuccess = (event) => {
+        db = event.target.result;
+        console.log("IndexedDB initialized successfully");
+        if (successCallback) {
+            successCallback();
+        }
+    };
+
+    request.onerror = (event) => {
+        console.error("Error initializing IndexedDB", event.target.error);
+    };
+}
+
+// Initialize IndexedDB when the page loads
+window.onload = initIndexedDB(loadFilesFromIndexedDB);
+
+    </script>
+</body>
+</html>
